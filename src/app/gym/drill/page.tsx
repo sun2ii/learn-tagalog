@@ -228,13 +228,13 @@ function DrillContent() {
             <div className="text-xs text-muted uppercase tracking-wide">Object Focus (ko/mo/niya...)</div>
             <div className="flex gap-2">
               {[
-                { form: "kinain", hint: "udah" },
-                { form: "kinakain", hint: "lagi" },
-                { form: "kakainin", hint: "bakal" },
-              ].map(({ form, hint }) => (
+                { form: "kinain", symbol: "×", label: "completed" },
+                { form: "kinakain", symbol: "○", label: "ongoing" },
+                { form: "kakainin", symbol: "?", label: "future" },
+              ].map(({ form, symbol, label }) => (
                 <div key={form} className="flex-1 text-center px-3 py-3 rounded-lg border border-question/30 bg-question/10">
                   <div className="font-semibold text-question text-lg">{form}</div>
-                  <div className="text-xs text-question/70">{hint}</div>
+                  <div className="text-xs text-question/70">{symbol} {label}</div>
                 </div>
               ))}
             </div>

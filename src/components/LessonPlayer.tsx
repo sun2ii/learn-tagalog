@@ -5,7 +5,7 @@ import type { Exchange, Lesson, Line } from "@/content/types";
 import { ColoredLine, Legend } from "./Token";
 import { PlayButton } from "./Audio";
 import { Speak } from "./Speak";
-import { rate } from "@/lib/progress";
+import { rateCard } from "@/lib/learner";
 
 // The loop, per exchange:
 //   listen → what's happening? → reveal (colored) → say your line → variation → rate → next
@@ -144,8 +144,8 @@ function Rate({ ex, onNext }: { ex: Exchange; onNext: () => void }) {
       </div>
       <p className="text-sm text-muted">Could you follow the variation without the text?</p>
       <div className="grid grid-cols-2 gap-3">
-        <button onClick={() => { rate(ex.id, false); onNext(); }} className="rounded-xl border-2 border-action py-4 font-semibold text-action">Not yet</button>
-        <button onClick={() => { rate(ex.id, true); onNext(); }} className="rounded-xl border-2 border-describe py-4 font-semibold text-describe">Got it</button>
+        <button onClick={() => { rateCard(ex.id, false); onNext(); }} className="rounded-xl border-2 border-action py-4 font-semibold text-action">Not yet</button>
+        <button onClick={() => { rateCard(ex.id, true); onNext(); }} className="rounded-xl border-2 border-describe py-4 font-semibold text-describe">Got it</button>
       </div>
     </div>
   );

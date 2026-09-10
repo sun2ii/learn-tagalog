@@ -1,7 +1,10 @@
 // Engine types: language-agnostic sentence representation
 
-export type Dimension = "aspect" | "actor" | "object" | "time" | "focus";
+export type Dimension = "aspect" | "actor" | "object" | "time" | "focus" | "polarity" | "mood";
 export type Focus = "actor" | "object";
+export type Polarity = "affirmative" | "negative";
+export type Mood = "statement" | "yes_no" | "wh_question";
+export type QuestionWord = "ano" | "sino" | "saan" | "kailan" | "bakit" | "paano";
 
 export interface SentenceState {
   root: string;
@@ -10,6 +13,10 @@ export interface SentenceState {
   focus: Focus;
   object?: string;
   time?: string;
+  // New fields for negation and questions
+  polarity?: Polarity;           // defaults to "affirmative"
+  mood?: Mood;                   // defaults to "statement"
+  questionWord?: QuestionWord;   // only when mood is "wh_question"
 }
 
 export interface StateDiff {

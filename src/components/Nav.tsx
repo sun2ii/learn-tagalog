@@ -2,12 +2,13 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+// Four core learning modes + home/menu
 const items = [
-  { href: "/", label: "Home", icon: "⌂" },
   { href: "/everyday/", label: "Phrases", icon: "💬" },
   { href: "/gym/", label: "Gym", icon: "◎" },
-  { href: "/lesson/kain/", label: "Lesson", icon: "▶" },
-  { href: "/anchors/", label: "Anchors", icon: "⚓" },
+  { href: "/builder/", label: "Build", icon: "⊞" },
+  { href: "/questions/", label: "Ask", icon: "?" },
+  { href: "/", label: "Menu", icon: "≡" },
 ];
 
 export function Nav() {

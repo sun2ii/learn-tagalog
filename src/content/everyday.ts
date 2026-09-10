@@ -1,16 +1,20 @@
 // Everyday Tagalog: Common functional phrases
 // Organized into practical groups for survival language
+// These are things you can use TODAY
 
 export interface Phrase {
   tagalog: string;
   english: string;
   indonesian?: string;
   note?: string;
+  // Concepts this phrase practices (for curriculum integration)
+  concepts?: string[];
 }
 
 export interface PhraseGroup {
   id: string;
   name: string;
+  description?: string;
   phrases: Phrase[];
 }
 
