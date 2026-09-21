@@ -4,12 +4,13 @@ import type { SentenceState, Exercise, ExerciseMode, Dimension, StateDiff } from
 import { diffStates, stateKey } from "./diff";
 import { transform } from "./transform";
 import { PRONOUN_KEYS } from "@/languages/tagalog/pronouns";
-import { NOUN_KEYS } from "@/languages/tagalog/nouns";
+import { NOUN_KEYS, getNounsForVerb, FOOD_NOUNS, DRINK_NOUNS } from "@/languages/tagalog/nouns";
 import { TIME_KEYS, isTimeCompatible } from "@/languages/tagalog/time";
 import { render, isValidState } from "@/languages/tagalog/renderer";
+import { VERBS, TRANSITIVE_VERB_ROOTS, isTransitive } from "@/languages/tagalog/verbs";
 
 // Stage configuration
-// Philosophy: DEPTH FIRST. Deep mastery of KAIN before expanding vocabulary.
+// Philosophy: DEPTH FIRST. Master patterns with kain first, then expand verbs.
 import type { Focus } from "./types";
 
 export interface Stage {
@@ -22,22 +23,25 @@ export interface Stage {
   aspects: string[];
   pronouns: string[];
   objects: string[];
-  // Focus switching for Stage 2
+  // Focus switching for Stage 2+
   focusTypes: Focus[];
+  // Which verb roots are used in this stage
+  verbRoots: string[];
 }
 
 export const STAGES: Stage[] = [
   {
     id: "1",
-    name: "Actor Focus",
-    description: "Complete actor-focus sentences",
+    name: "Actor Focus: Kain",
+    description: "Eating sentences with actor focus",
     allowedDimensions: ["aspect", "actor", "object", "time"],
     requireObject: true,
     allowTime: true,
     aspects: ["completed", "ongoing", "contemplated"],
     pronouns: PRONOUN_KEYS,
-    objects: NOUN_KEYS,
+    objects: FOOD_NOUNS, // Only food for kain
     focusTypes: ["actor"],
+    verbRoots: ["kain"],
   },
   {
     id: "2",
@@ -48,8 +52,74 @@ export const STAGES: Stage[] = [
     allowTime: false,
     aspects: ["completed", "ongoing", "contemplated"],
     pronouns: PRONOUN_KEYS,
-    objects: NOUN_KEYS,
+    objects: FOOD_NOUNS, // Keep food for consistency
     focusTypes: ["actor", "object"],
+    verbRoots: ["kain"],
+  },
+  {
+    id: "3",
+    name: "Inom: Drinking",
+    description: "Drinking sentences with actor focus",
+    allowedDimensions: ["aspect", "actor", "object", "time"],
+    requireObject: true,
+    allowTime: true,
+    aspects: ["completed", "ongoing", "contemplated"],
+    pronouns: PRONOUN_KEYS,
+    objects: DRINK_NOUNS,
+    focusTypes: ["actor"],
+    verbRoots: ["inom"],
+  },
+  {
+    id: "4",
+    name: "Kuha & Bili",
+    description: "Getting and buying things",
+    allowedDimensions: ["aspect", "actor", "object"],
+    requireObject: true,
+    allowTime: false,
+    aspects: ["completed", "ongoing", "contemplated"],
+    pronouns: PRONOUN_KEYS,
+    objects: [], // Will be filled dynamically per verb
+    focusTypes: ["actor"],
+    verbRoots: ["kuha", "bili"],
+  },
+  {
+    id: "5",
+    name: "Basa & Sulat",
+    description: "Reading and writing",
+    allowedDimensions: ["aspect", "actor", "object"],
+    requireObject: true,
+    allowTime: false,
+    aspects: ["completed", "ongoing", "contemplated"],
+    pronouns: PRONOUN_KEYS,
+    objects: [], // Will be filled dynamically per verb
+    focusTypes: ["actor"],
+    verbRoots: ["basa", "sulat"],
+  },
+  {
+    id: "6",
+    name: "Gawa: Making",
+    description: "Making things",
+    allowedDimensions: ["aspect", "actor", "object"],
+    requireObject: true,
+    allowTime: false,
+    aspects: ["completed", "ongoing", "contemplated"],
+    pronouns: PRONOUN_KEYS,
+    objects: [], // Will be filled dynamically
+    focusTypes: ["actor"],
+    verbRoots: ["gawa"],
+  },
+  {
+    id: "7",
+    name: "All Verbs Mixed",
+    description: "All transitive verbs combined",
+    allowedDimensions: ["aspect", "actor", "object", "time"],
+    requireObject: true,
+    allowTime: true,
+    aspects: ["completed", "ongoing", "contemplated"],
+    pronouns: PRONOUN_KEYS,
+    objects: [], // Dynamic per verb
+    focusTypes: ["actor"],
+    verbRoots: TRANSITIVE_VERB_ROOTS,
   },
 ];
 
@@ -79,30 +149,51 @@ function shuffle<T>(arr: T[]): T[] {
 }
 
 /**
+ * Get objects valid for a specific verb
+ */
+function getObjectsForStageAndVerb(stage: Stage, verbRoot: string): string[] {
+  // If stage has specific objects defined, use those
+  if (stage.objects.length > 0) {
+    return stage.objects;
+  }
+  // Otherwise, get compatible nouns for this verb
+  return getNounsForVerb(verbRoot);
+}
+
+/**
  * Generate all possible states for a stage
  */
 function allStatesForStage(stage: Stage): SentenceState[] {
   const states: SentenceState[] = [];
 
-  for (const focus of stage.focusTypes) {
-    for (const aspect of stage.aspects) {
-      for (const actor of stage.pronouns) {
-        const objects = stage.requireObject && stage.objects.length > 0 ? stage.objects : [undefined];
+  for (const verbRoot of stage.verbRoots) {
+    const objectsForVerb = getObjectsForStageAndVerb(stage, verbRoot);
 
-        for (const object of objects) {
-          if (stage.allowTime) {
-            // Include time variations - only compatible times for this aspect
-            const compatibleTimes = TIME_KEYS.filter(t => isTimeCompatible(t, aspect));
-            for (const time of compatibleTimes) {
-              const state: SentenceState = { root: "kain", aspect, actor, focus };
+    for (const focus of stage.focusTypes) {
+      // Skip object focus for intransitive verbs
+      if (focus === "object" && !isTransitive(verbRoot)) {
+        continue;
+      }
+
+      for (const aspect of stage.aspects) {
+        for (const actor of stage.pronouns) {
+          const objects = stage.requireObject && objectsForVerb.length > 0 ? objectsForVerb : [undefined];
+
+          for (const object of objects) {
+            if (stage.allowTime) {
+              // Include time variations - only compatible times for this aspect
+              const compatibleTimes = TIME_KEYS.filter(t => isTimeCompatible(t, aspect));
+              for (const time of compatibleTimes) {
+                const state: SentenceState = { root: verbRoot, aspect, actor, focus };
+                if (object) state.object = object;
+                state.time = time;
+                states.push(state);
+              }
+            } else {
+              const state: SentenceState = { root: verbRoot, aspect, actor, focus };
               if (object) state.object = object;
-              state.time = time;
               states.push(state);
             }
-          } else {
-            const state: SentenceState = { root: "kain", aspect, actor, focus };
-            if (object) state.object = object;
-            states.push(state);
           }
         }
       }
@@ -116,15 +207,25 @@ function allStatesForStage(stage: Stage): SentenceState[] {
  * Generate a random valid sentence state for a stage
  */
 export function randomState(stage: Stage): SentenceState {
+  // Pick a random verb root from the stage
+  const verbRoot = pick(stage.verbRoots);
+  const objectsForVerb = getObjectsForStageAndVerb(stage, verbRoot);
+
+  // Pick focus, but exclude object focus for intransitive verbs
+  let focusTypes = stage.focusTypes;
+  if (!isTransitive(verbRoot)) {
+    focusTypes = focusTypes.filter(f => f !== "object");
+  }
+
   const state: SentenceState = {
-    root: "kain",
+    root: verbRoot,
     aspect: pick(stage.aspects),
     actor: pick(stage.pronouns),
-    focus: pick(stage.focusTypes),
+    focus: pick(focusTypes),
   };
 
-  if (stage.requireObject && stage.objects.length > 0) {
-    state.object = pick(stage.objects);
+  if (stage.requireObject && objectsForVerb.length > 0) {
+    state.object = pick(objectsForVerb);
   }
 
   if (stage.allowTime && Math.random() > 0.5) {

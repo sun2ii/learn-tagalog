@@ -4,17 +4,18 @@ import { Legend } from "@/components/Token";
 // The system on one screen: skeleton → pronouns → particles/markers → question words → verb engine.
 export default function MapPage() {
   return (
-    <div className="space-y-8">
+    <div className="space-y-12 animate-rise">
       <div>
-        <h1 className="text-2xl font-bold">The system</h1>
-        <p className="text-muted text-sm">Five pieces. Everything you'll hear is built from them.</p>
-        <div className="mt-2"><Legend /></div>
+        <div className="eyebrow">Reference</div>
+        <h1 className="mt-2 text-[34px] font-semibold leading-none tracking-tight">The system.</h1>
+        <p className="mt-2 text-muted">Six pieces. Everything you&rsquo;ll hear is built from them.</p>
+        <div className="mt-4"><Legend /></div>
       </div>
 
       <Section n="1" title="Sentence skeleton" note={skeleton.note}>
         {skeleton.examples.map((e) => (
           <div key={e.tl} className="rounded-xl border border-line bg-card p-3">
-            <div className="text-lg font-semibold">{e.tl}</div>
+            <div className="tl text-[22px] font-medium">{e.tl}</div>
             <div className="text-sm text-muted">{e.en}</div>
             <div className="mt-1 text-[11px] uppercase tracking-wide text-muted">{e.tag}</div>
           </div>
@@ -48,13 +49,13 @@ export default function MapPage() {
       </Section>
 
       <Section n="6" title="Verb engine — aspect, not tense" note={verbEngine.note}>
-        <Table head={["root", "type", "done", "ongoing", "not yet"]}
+        <Table head={["root", "type", "not yet · 0", "ongoing · ½", "done · 1"]}
           rows={verbEngine.rows.map((r) => [
             <span key="r"><b>{r.root}</b><div className="text-[11px] text-muted">{r.en}</div></span>,
             <span key="t" className="text-muted">{r.type}</span>,
-            <b key="d" className="text-action">{r.done}</b>,
-            <b key="o" className="text-action">{r.ongoing}</b>,
-            <b key="n" className="text-action">{r.notyet}</b>,
+            <b key="n" data-aspect="contemplated">{r.notyet}</b>,
+            <b key="o" data-aspect="ongoing">{r.ongoing}</b>,
+            <b key="d" data-aspect="completed">{r.done}</b>,
           ])} />
         <ul className="space-y-1 text-sm">
           {verbEngine.mechanism.map((m) => <li key={m} className="rounded-lg bg-card border border-line p-2">{m}</li>)}
@@ -69,7 +70,7 @@ function Section({ n, title, note, children }: { n: string; title: string; note:
   return (
     <section className="space-y-3">
       <div>
-        <h2 className="text-lg font-bold"><span className="text-muted mr-2">{n}</span>{title}</h2>
+        <h2 className="text-[20px] font-semibold tracking-tight"><span className="mr-2 text-faint tabular-nums">{n}</span>{title}</h2>
         <p className="text-sm text-muted">{note}</p>
       </div>
       {children}
@@ -91,8 +92,8 @@ function Table({ head, rows }: { head: string[]; rows: React.ReactNode[][] }) {
 function Contrast({ a, aEn, b, bEn }: { a: string; aEn: string; b: string; bEn: string }) {
   return (
     <div className="grid grid-cols-2 gap-2 text-sm">
-      <div className="rounded-xl border border-line bg-card p-2"><div className="font-semibold">{a}</div><div className="text-muted">{aEn}</div></div>
-      <div className="rounded-xl border border-line bg-card p-2"><div className="font-semibold">{b}</div><div className="text-muted">{bEn}</div></div>
+      <div className="rounded-xl border border-line bg-card p-3"><div className="tl text-[18px] font-medium">{a}</div><div className="text-muted">{aEn}</div></div>
+      <div className="rounded-xl border border-line bg-card p-3"><div className="tl text-[18px] font-medium">{b}</div><div className="text-muted">{bEn}</div></div>
     </div>
   );
 }

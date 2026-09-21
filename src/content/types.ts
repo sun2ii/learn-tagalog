@@ -24,6 +24,7 @@ export interface Token {
   root?: string; // dictionary root if inflected (kumain -> kain)
   note?: string; // mechanism note shown on tap
   anchor?: Anchor;
+  aspect?: "contemplated" | "ongoing" | "completed"; // verbs only: 0 · ½ · 1
 }
 
 export interface Line {

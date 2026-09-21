@@ -12,7 +12,10 @@ async def main():
         path = os.path.join(OUT, f"{ln['id']}.mp3")
         if os.path.exists(path) and os.path.getsize(path) > 0: continue
         # Speaker A lines get the female voice; everything else the male voice, so a dialogue sounds like two people.
-        voice = VOICE["A"] if ln["id"].endswith("a") or ln["id"].endswith("c") or ln["id"].endswith("v") else VOICE["B"]
+        if ln.get("voice") in VOICE:
+            voice = VOICE[ln["voice"]]
+        else:
+            voice = VOICE["A"] if ln["id"].endswith("a") or ln["id"].endswith("c") or ln["id"].endswith("v") else VOICE["B"]
         c = edge_tts.Communicate(ln["text"], voice, rate="-10%", proxy=proxy)
         await c.save(path); print("ok", ln["id"], ln["text"])
 asyncio.run(main())

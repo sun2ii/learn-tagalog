@@ -3,7 +3,7 @@
 
 import type { SentenceState, Focus, Polarity, Mood } from "@/engine/types";
 import type { Aspect, FocusType } from "./verbs";
-import { getVerbForm, ASPECT_ENGLISH } from "./verbs";
+import { getVerbForm, getVerbEntry, VERBS } from "./verbs";
 import { getActorForm, getAgentForm, getEnglishSubject, PRONOUNS } from "./pronouns";
 import { getNounTagalog, getNounEnglish } from "./nouns";
 import { getTimeTagalog, getTimeEnglish, TIME_EXPRESSIONS } from "./time";
@@ -295,6 +295,7 @@ function renderWhQuestion(state: SentenceState): RenderedSentence {
 function renderEnglish(state: SentenceState): string {
   const subject = getEnglishSubject(state.actor);
   const aspect = state.aspect as Aspect;
+  const verb = getVerbEntry(state.root);
 
   // Handle "we" distinction
   let subjectStr = subject;
@@ -304,25 +305,30 @@ function renderEnglish(state: SentenceState): string {
     subjectStr = "we (including you)";
   }
 
+  // Get verb-specific English forms
+  const verbBase = verb?.meaning || state.root;
+  const verbPast = verb?.meaningPast || `${verbBase}ed`;
+  const verbOngoing = verb?.meaningOngoing || `${verbBase}ing`;
+
   // Build verb phrase based on aspect
   let verbPhrase: string;
   const objectStr = state.object ? getNounEnglish(state.object) : "";
 
   switch (aspect) {
     case "completed":
-      verbPhrase = objectStr ? `ate ${objectStr}` : "ate";
+      verbPhrase = objectStr ? `${verbPast} ${objectStr}` : verbPast;
       break;
     case "ongoing":
       // Handle singular/plural for "is/are eating"
       const isPlural = PRONOUNS[state.actor]?.plural;
-      const be = (state.actor === "ako") ? "am" : (isPlural ? "are" : "is");
-      verbPhrase = objectStr ? `${be} eating ${objectStr}` : `${be} eating`;
+      const be = (state.actor === "ako") ? "am" : (isPlural || state.actor === "ikaw" || state.actor === "kayo" ? "are" : "is");
+      verbPhrase = objectStr ? `${be} ${verbOngoing} ${objectStr}` : `${be} ${verbOngoing}`;
       break;
     case "contemplated":
-      verbPhrase = objectStr ? `will eat ${objectStr}` : "will eat";
+      verbPhrase = objectStr ? `will ${verbBase} ${objectStr}` : `will ${verbBase}`;
       break;
     default:
-      verbPhrase = "eat";
+      verbPhrase = verbBase;
   }
 
   // Add time if present
@@ -336,28 +342,32 @@ function renderEnglish(state: SentenceState): string {
 function renderEnglishNegative(state: SentenceState): string {
   const subject = getEnglishSubject(state.actor);
   const aspect = state.aspect as Aspect;
+  const verb = getVerbEntry(state.root);
 
   let subjectStr = subject;
   if (state.actor === "kami") subjectStr = "we (not you)";
   else if (state.actor === "tayo") subjectStr = "we (including you)";
+
+  const verbBase = verb?.meaning || state.root;
+  const verbOngoing = verb?.meaningOngoing || `${verbBase}ing`;
 
   const objectStr = state.object ? getNounEnglish(state.object) : "";
   let verbPhrase: string;
 
   switch (aspect) {
     case "completed":
-      verbPhrase = objectStr ? `did not eat ${objectStr}` : "did not eat";
+      verbPhrase = objectStr ? `did not ${verbBase} ${objectStr}` : `did not ${verbBase}`;
       break;
     case "ongoing":
       const isPlural = PRONOUNS[state.actor]?.plural;
-      const be = (state.actor === "ako") ? "am" : (isPlural ? "are" : "is");
-      verbPhrase = objectStr ? `${be} not eating ${objectStr}` : `${be} not eating`;
+      const be = (state.actor === "ako") ? "am" : (isPlural || state.actor === "ikaw" || state.actor === "kayo" ? "are" : "is");
+      verbPhrase = objectStr ? `${be} not ${verbOngoing} ${objectStr}` : `${be} not ${verbOngoing}`;
       break;
     case "contemplated":
-      verbPhrase = objectStr ? `will not eat ${objectStr}` : "will not eat";
+      verbPhrase = objectStr ? `will not ${verbBase} ${objectStr}` : `will not ${verbBase}`;
       break;
     default:
-      verbPhrase = "do not eat";
+      verbPhrase = `do not ${verbBase}`;
   }
 
   const timeStr = state.time ? ` ${getTimeEnglish(state.time)}` : "";
@@ -369,10 +379,14 @@ function renderEnglishYesNo(state: SentenceState): string {
   const subject = getEnglishSubject(state.actor);
   const aspect = state.aspect as Aspect;
   const polarity = state.polarity || "affirmative";
+  const verb = getVerbEntry(state.root);
 
   let subjectStr = subject;
   if (state.actor === "kami") subjectStr = "we (not you)";
   else if (state.actor === "tayo") subjectStr = "we (including you)";
+
+  const verbBase = verb?.meaning || state.root;
+  const verbOngoing = verb?.meaningOngoing || `${verbBase}ing`;
 
   const objectStr = state.object ? ` ${getNounEnglish(state.object)}` : "";
   const timeStr = state.time ? ` ${getTimeEnglish(state.time)}` : "";
@@ -381,18 +395,18 @@ function renderEnglishYesNo(state: SentenceState): string {
   let question: string;
   switch (aspect) {
     case "completed":
-      question = `Did ${subjectStr} ${negStr}eat${objectStr}${timeStr}?`;
+      question = `Did ${subjectStr} ${negStr}${verbBase}${objectStr}${timeStr}?`;
       break;
     case "ongoing":
       const isPlural = PRONOUNS[state.actor]?.plural;
-      const be = (state.actor === "ako") ? "Am" : (isPlural ? "Are" : "Is");
-      question = `${be} ${subjectStr} ${negStr}eating${objectStr}${timeStr}?`;
+      const be = (state.actor === "ako") ? "Am" : (isPlural || state.actor === "ikaw" || state.actor === "kayo" ? "Are" : "Is");
+      question = `${be} ${subjectStr} ${negStr}${verbOngoing}${objectStr}${timeStr}?`;
       break;
     case "contemplated":
-      question = `Will ${subjectStr} ${negStr}eat${objectStr}${timeStr}?`;
+      question = `Will ${subjectStr} ${negStr}${verbBase}${objectStr}${timeStr}?`;
       break;
     default:
-      question = `Does ${subjectStr} ${negStr}eat${objectStr}${timeStr}?`;
+      question = `Does ${subjectStr} ${negStr}${verbBase}${objectStr}${timeStr}?`;
   }
 
   return question.charAt(0).toUpperCase() + question.slice(1);
@@ -402,10 +416,17 @@ function renderEnglishWh(state: SentenceState): string {
   const subject = getEnglishSubject(state.actor);
   const aspect = state.aspect as Aspect;
   const qWord = state.questionWord!;
+  const verb = getVerbEntry(state.root);
 
   let subjectStr = subject;
   if (state.actor === "kami") subjectStr = "we (not you)";
   else if (state.actor === "tayo") subjectStr = "we (including you)";
+
+  const verbBase = verb?.meaning || state.root;
+  const verbPast = verb?.meaningPast || `${verbBase}ed`;
+  const verbOngoing = verb?.meaningOngoing || `${verbBase}ing`;
+  // Third person singular present (for "who eats")
+  const verb3ps = verbBase.endsWith("s") ? `${verbBase}es` : `${verbBase}s`;
 
   const objectStr = state.object ? ` ${getNounEnglish(state.object)}` : "";
   const timeStr = state.time ? ` ${getTimeEnglish(state.time)}` : "";
@@ -427,50 +448,50 @@ function renderEnglishWh(state: SentenceState): string {
     // Asking about object
     switch (aspect) {
       case "completed":
-        question = `${engQWord} did ${subjectStr} eat${timeStr}?`;
+        question = `${engQWord} did ${subjectStr} ${verbBase}${timeStr}?`;
         break;
       case "ongoing":
         const isPlural = PRONOUNS[state.actor]?.plural;
-        const be = (state.actor === "ako") ? "am" : (isPlural ? "are" : "is");
-        question = `${engQWord} ${be} ${subjectStr} eating${timeStr}?`;
+        const be = (state.actor === "ako") ? "am" : (isPlural || state.actor === "ikaw" || state.actor === "kayo" ? "are" : "is");
+        question = `${engQWord} ${be} ${subjectStr} ${verbOngoing}${timeStr}?`;
         break;
       case "contemplated":
-        question = `${engQWord} will ${subjectStr} eat${timeStr}?`;
+        question = `${engQWord} will ${subjectStr} ${verbBase}${timeStr}?`;
         break;
       default:
-        question = `${engQWord} does ${subjectStr} eat${timeStr}?`;
+        question = `${engQWord} does ${subjectStr} ${verbBase}${timeStr}?`;
     }
   } else if (qWord === "sino") {
     // Asking about actor
     switch (aspect) {
       case "completed":
-        question = `${engQWord} ate${objectStr}${timeStr}?`;
+        question = `${engQWord} ${verbPast}${objectStr}${timeStr}?`;
         break;
       case "ongoing":
-        question = `${engQWord} is eating${objectStr}${timeStr}?`;
+        question = `${engQWord} is ${verbOngoing}${objectStr}${timeStr}?`;
         break;
       case "contemplated":
-        question = `${engQWord} will eat${objectStr}${timeStr}?`;
+        question = `${engQWord} will ${verbBase}${objectStr}${timeStr}?`;
         break;
       default:
-        question = `${engQWord} eats${objectStr}${timeStr}?`;
+        question = `${engQWord} ${verb3ps}${objectStr}${timeStr}?`;
     }
   } else {
     // kailan, bakit, saan, paano
     switch (aspect) {
       case "completed":
-        question = `${engQWord} did ${subjectStr} eat${objectStr}?`;
+        question = `${engQWord} did ${subjectStr} ${verbBase}${objectStr}?`;
         break;
       case "ongoing":
         const isPlural = PRONOUNS[state.actor]?.plural;
-        const be = (state.actor === "ako") ? "am" : (isPlural ? "are" : "is");
-        question = `${engQWord} ${be} ${subjectStr} eating${objectStr}?`;
+        const be = (state.actor === "ako") ? "am" : (isPlural || state.actor === "ikaw" || state.actor === "kayo" ? "are" : "is");
+        question = `${engQWord} ${be} ${subjectStr} ${verbOngoing}${objectStr}?`;
         break;
       case "contemplated":
-        question = `${engQWord} will ${subjectStr} eat${objectStr}?`;
+        question = `${engQWord} will ${subjectStr} ${verbBase}${objectStr}?`;
         break;
       default:
-        question = `${engQWord} does ${subjectStr} eat${objectStr}?`;
+        question = `${engQWord} does ${subjectStr} ${verbBase}${objectStr}?`;
     }
   }
 
@@ -482,16 +503,31 @@ function renderEnglishWh(state: SentenceState): string {
  */
 export function isValidState(state: SentenceState): boolean {
   const focus: Focus = state.focus || "actor";
+  const verb = getVerbEntry(state.root);
 
-  // Check verb exists for this focus type
+  // Check verb exists
+  if (!verb) return false;
+
+  // Check verb form exists for this focus type
   const verbForm = getVerbForm(state.root, state.aspect as Aspect, focus as FocusType);
   if (!verbForm) return false;
 
   // Check pronoun exists
   if (!PRONOUNS[state.actor]) return false;
 
-  // Object-focus requires an object
-  if (focus === "object" && !state.object) return false;
+  // Object-focus requires an object and a transitive verb
+  if (focus === "object") {
+    if (!state.object) return false;
+    if (!verb.transitive) return false;
+  }
+
+  // Transitive verbs generally require objects in this app
+  if (verb.transitive && !state.object) {
+    // Allow for question modes where object might be omitted
+    if (state.mood !== "wh_question") {
+      return false;
+    }
+  }
 
   // If time is specified, check compatibility with aspect
   if (state.time) {

@@ -1,297 +1,132 @@
 "use client";
-
-import { useState, useEffect, useCallback } from "react";
-import { render, isValidState } from "@/languages/tagalog/renderer";
-import { getVerbForm } from "@/languages/tagalog/verbs";
-import { getActorForm, getAgentForm, PRONOUNS } from "@/languages/tagalog/pronouns";
-import { getNounTagalog, NOUNS } from "@/languages/tagalog/nouns";
-import { getTimeTagalog, TIME_EXPRESSIONS } from "@/languages/tagalog/time";
+import Link from "next/link";
+import { useEffect, useState } from "react";
+import { EnterToStart, Eyebrow, Kbd, LinkButton } from "@/components/ui";
+import { analyze, nounsFor } from "@/lib/analyze";
+import { VERBS } from "@/languages/tagalog/verbs";
+import { Info } from "@/components/PieceInfo";
+import { nextUp, verdicts } from "@/lib/slots";
 import { getLearnerState } from "@/lib/learner";
-import { getUnlockedConcepts } from "@/curriculum/unlock";
-import { getVocabularyUpTo } from "@/curriculum";
-import type { SentenceState, Focus } from "@/engine/types";
 import type { LearnerState } from "@/curriculum/types";
+import type { SentencePart } from "@/languages/tagalog/renderer";
 
-type BuilderPiece = {
-  id: string;
-  text: string;
-  type: "verb" | "pronoun" | "noun" | "time" | "particle" | "negation" | "question";
-  value?: string;
-};
+type Role = SentencePart["dimension"];
+interface Piece { text: string; role: Role; label: string }
 
-// All available pieces based on curriculum
-function getAvailablePieces(unlockedConcepts: string[]): BuilderPiece[] {
-  const pieces: BuilderPiece[] = [];
+/** The roots the builder can work with: every root the renderer knows that takes an object. */
+const ROOTS = Object.keys(VERBS).filter((r) => VERBS[r].transitive && VERBS[r].objectFocus);
+const ROOT_KEY = "tagalog.builder.root";
 
-  // Always have verbs (kain for now)
-  if (unlockedConcepts.includes("aspect")) {
-    pieces.push(
-      { id: "v-completed", text: "kumain", type: "verb", value: "completed" },
-      { id: "v-ongoing", text: "kumakain", type: "verb", value: "ongoing" },
-      { id: "v-contemplated", text: "kakain", type: "verb", value: "contemplated" },
-    );
-  }
-
-  // Object-focus verbs
-  if (unlockedConcepts.includes("focus")) {
-    pieces.push(
-      { id: "vo-completed", text: "kinain", type: "verb", value: "completed-obj" },
-      { id: "vo-ongoing", text: "kinakain", type: "verb", value: "ongoing-obj" },
-      { id: "vo-contemplated", text: "kakainin", type: "verb", value: "contemplated-obj" },
-    );
-  }
-
-  // Pronouns
-  if (unlockedConcepts.includes("actor")) {
-    pieces.push(
-      { id: "p-ako", text: "ako", type: "pronoun", value: "ako" },
-      { id: "p-ka", text: "ka", type: "pronoun", value: "ikaw" },
-      { id: "p-siya", text: "siya", type: "pronoun", value: "siya" },
-      { id: "p-kami", text: "kami", type: "pronoun", value: "kami" },
-      { id: "p-tayo", text: "tayo", type: "pronoun", value: "tayo" },
-      { id: "p-kayo", text: "kayo", type: "pronoun", value: "kayo" },
-      { id: "p-sila", text: "sila", type: "pronoun", value: "sila" },
-    );
-
-    // Ng-form pronouns for object focus
-    if (unlockedConcepts.includes("focus")) {
-      pieces.push(
-        { id: "pn-ko", text: "ko", type: "pronoun", value: "ako-ng" },
-        { id: "pn-mo", text: "mo", type: "pronoun", value: "ikaw-ng" },
-        { id: "pn-niya", text: "niya", type: "pronoun", value: "siya-ng" },
-        { id: "pn-namin", text: "namin", type: "pronoun", value: "kami-ng" },
-        { id: "pn-natin", text: "natin", type: "pronoun", value: "tayo-ng" },
-        { id: "pn-ninyo", text: "ninyo", type: "pronoun", value: "kayo-ng" },
-        { id: "pn-nila", text: "nila", type: "pronoun", value: "sila-ng" },
-      );
-    }
-  }
-
-  // Particles
-  if (unlockedConcepts.includes("object")) {
-    pieces.push(
-      { id: "pt-ng", text: "ng", type: "particle" },
-      { id: "pt-ang", text: "ang", type: "particle" },
-    );
-  }
-
-  // Nouns
-  if (unlockedConcepts.includes("object")) {
-    pieces.push(
-      { id: "n-mangga", text: "mangga", type: "noun", value: "mangga" },
-      { id: "n-kanin", text: "kanin", type: "noun", value: "kanin" },
-      { id: "n-isda", text: "isda", type: "noun", value: "isda" },
-      { id: "n-manok", text: "manok", type: "noun", value: "manok" },
-      { id: "n-tinapay", text: "tinapay", type: "noun", value: "tinapay" },
-      { id: "n-mansanas", text: "mansanas", type: "noun", value: "mansanas" },
-    );
-  }
-
-  // Time
-  if (unlockedConcepts.includes("time")) {
-    pieces.push(
-      { id: "t-kahapon", text: "kahapon", type: "time", value: "kahapon" },
-      { id: "t-ngayon", text: "ngayon", type: "time", value: "ngayon" },
-      { id: "t-mamaya", text: "mamaya", type: "time", value: "mamaya" },
-      { id: "t-bukas", text: "bukas", type: "time", value: "bukas" },
-    );
-  }
-
-  // Negation
-  if (unlockedConcepts.includes("negation")) {
-    pieces.push(
-      { id: "neg-hindi", text: "hindi", type: "negation" },
-    );
-  }
-
-  // Question marker
-  if (unlockedConcepts.includes("yes-no")) {
-    pieces.push(
-      { id: "q-ba", text: "ba", type: "question" },
-    );
-  }
-
-  // Question words
-  if (unlockedConcepts.includes("wh-questions")) {
-    pieces.push(
-      { id: "q-ano", text: "ano", type: "question", value: "ano" },
-      { id: "q-sino", text: "sino", type: "question", value: "sino" },
-      { id: "q-saan", text: "saan", type: "question", value: "saan" },
-      { id: "q-kailan", text: "kailan", type: "question", value: "kailan" },
-      { id: "q-bakit", text: "bakit", type: "question", value: "bakit" },
-      { id: "q-paano", text: "paano", type: "question", value: "paano" },
-    );
-  }
-
-  return pieces;
+/** Aspect of any verb form, for the red shades. */
+const ASPECT_OF: Record<string, string> = {};
+for (const v of Object.values(VERBS)) {
+  for (const [a, f] of Object.entries(v.actorFocus)) ASPECT_OF[f] = a;
+  if (v.objectFocus) for (const [a, f] of Object.entries(v.objectFocus)) ASPECT_OF[f] = a;
 }
 
-// Color mapping for piece types
-const typeColors: Record<string, string> = {
-  verb: "text-action border-action/40 bg-action/10",
-  pronoun: "text-person border-person/40 bg-person/10",
-  noun: "text-describe border-describe/40 bg-describe/10",
-  time: "text-time border-time/40 bg-time/10",
-  particle: "text-particle border-particle/40 bg-particle/10",
-  negation: "text-red-500 border-red-500/40 bg-red-500/10",
-  question: "text-question border-question/40 bg-question/10",
-};
+const ORDER = ["contemplated", "ongoing", "completed"] as const;   // not yet → happening → done
+function groupsFor(root: string): { label: string; role: Role; pieces: string[] }[] {
+  const v = VERBS[root];
+  return [
+    { label: "not", role: "negation", pieces: ["hindi"] },
+    { label: "ask", role: "question", pieces: ["ba", "ano", "sino", "saan", "kailan", "bakit", "paano"] },
+    { label: "verb · actor", role: "verb", pieces: ORDER.map((a) => v.actorFocus[a]) },
+    { label: "verb · object", role: "verb", pieces: v.objectFocus ? ORDER.map((a) => v.objectFocus![a]) : [] },
+    { label: "who · ang", role: "actor", pieces: ["ako", "ka", "siya", "kami", "tayo", "kayo", "sila"] },
+    { label: "who · ng", role: "actor", pieces: ["ko", "mo", "niya", "namin", "natin", "ninyo", "nila"] },
+    { label: "marker", role: "particle", pieces: ["ng", "ang"] },
+    { label: "thing", role: "object", pieces: nounsFor(root).slice(0, 7) },
+    { label: "when", role: "time", pieces: ["kahapon", "ngayon", "mamaya", "bukas"] },
+  ];
+}
 
 export default function BuilderPage() {
   const [state, setState] = useState<LearnerState | null>(null);
-  const [sentence, setSentence] = useState<BuilderPiece[]>([]);
-  const [availablePieces, setAvailablePieces] = useState<BuilderPiece[]>([]);
-
-  useEffect(() => {
-    const learnerState = getLearnerState();
-    setState(learnerState);
-    const unlocked = getUnlockedConcepts(learnerState);
-    setAvailablePieces(getAvailablePieces(unlocked));
-  }, []);
-
-  const addPiece = (piece: BuilderPiece) => {
-    setSentence(prev => [...prev, { ...piece, id: `${piece.id}-${Date.now()}` }]);
-  };
-
-  const removePiece = (index: number) => {
-    setSentence(prev => prev.filter((_, i) => i !== index));
-  };
-
-  const clearSentence = () => {
-    setSentence([]);
-  };
-
-  // Build the sentence string
-  const sentenceText = sentence.map(p => p.text).join(" ");
-
-  // Group pieces by type for display
-  const piecesByType = availablePieces.reduce((acc, piece) => {
-    if (!acc[piece.type]) acc[piece.type] = [];
-    acc[piece.type].push(piece);
-    return acc;
-  }, {} as Record<string, BuilderPiece[]>);
-
-  const typeLabels: Record<string, string> = {
-    verb: "Verbs",
-    pronoun: "Pronouns",
-    noun: "Objects",
-    time: "Time",
-    particle: "Particles",
-    negation: "Negation",
-    question: "Questions",
-  };
-
-  const typeOrder = ["negation", "question", "verb", "pronoun", "particle", "noun", "time"];
+  const [line, setLine] = useState<Piece[]>([]);
+  const [root, setRoot] = useState("kain");
+  useEffect(() => { setState(getLearnerState()); try { const r = localStorage.getItem(ROOT_KEY); if (r && VERBS[r]) setRoot(r); } catch {} }, []);
+  const pickRoot = (r: string) => { setRoot(r); setLine([]); try { localStorage.setItem(ROOT_KEY, r); } catch {} };
+  const GROUPS = groupsFor(root);
+  const s = state?.modeStats.builder;
+  const acc = s && s.totalReps ? Math.round((s.correct / s.totalReps) * 100) : null;
+  const isQ = line.some((p) => p.role === "question");
+  const a = analyze(line);
+  const v = verdicts(line, GROUPS.flatMap((g) => g.pieces));
+  const nu = nextUp(line);
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">Sentence Builder</h1>
-        <p className="text-muted">
-          Tap pieces to construct sentences.
-        </p>
-      </div>
-
-      {/* Sentence workspace */}
-      <div className="rounded-2xl border border-line bg-card p-4 min-h-[120px]">
-        {sentence.length === 0 ? (
-          <div className="text-center text-muted py-8">
-            Tap words below to build a sentence
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {/* Built sentence */}
-            <div className="flex flex-wrap gap-2">
-              {sentence.map((piece, i) => (
-                <button
-                  key={piece.id}
-                  onClick={() => removePiece(i)}
-                  className={`px-3 py-2 rounded-lg border font-medium cursor-pointer transition-all hover:opacity-70 ${typeColors[piece.type]}`}
-                >
-                  {piece.text}
-                  <span className="ml-1 text-xs opacity-50">×</span>
-                </button>
-              ))}
-            </div>
-
-            {/* Full sentence display */}
-            <div className="pt-3 border-t border-line/50">
-              <div className="text-xl font-semibold">
-                {sentenceText.charAt(0).toUpperCase() + sentenceText.slice(1)}
-                {sentence.some(p => p.type === "question") ? "?" : "."}
-              </div>
-            </div>
-
-            {/* Clear button */}
-            <button
-              onClick={clearSentence}
-              className="text-sm text-muted hover:text-foreground cursor-pointer"
-            >
-              Clear all
-            </button>
-          </div>
-        )}
-      </div>
-
-      {/* Available pieces */}
-      <div className="space-y-4">
-        {typeOrder.map(type => {
-          const pieces = piecesByType[type];
-          if (!pieces || pieces.length === 0) return null;
-
-          return (
-            <div key={type} className="space-y-2">
-              <div className="text-xs text-muted uppercase tracking-wide">
-                {typeLabels[type]}
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {pieces.map(piece => (
-                  <button
-                    key={piece.id}
-                    onClick={() => addPiece(piece)}
-                    className={`px-3 py-2 rounded-lg border font-medium cursor-pointer transition-all hover:scale-105 ${typeColors[piece.type]}`}
-                  >
-                    {piece.text}
-                  </button>
-                ))}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Example sentences */}
-      <div className="rounded-2xl border border-line bg-card p-4 space-y-3">
-        <div className="text-sm font-medium">Example patterns:</div>
-        <div className="space-y-2 text-sm">
-          <div>
-            <span className="text-action">Kumain</span>{" "}
-            <span className="text-person">ako</span>{" "}
-            <span className="text-particle">ng</span>{" "}
-            <span className="text-describe">isda</span>.
-            <span className="text-muted ml-2">(I ate fish)</span>
-          </div>
-          <div>
-            <span className="text-action">Kinain</span>{" "}
-            <span className="text-person">ko</span>{" "}
-            <span className="text-particle">ang</span>{" "}
-            <span className="text-describe">isda</span>.
-            <span className="text-muted ml-2">(I ate the fish)</span>
-          </div>
-          <div>
-            <span className="text-red-500">Hindi</span>{" "}
-            <span className="text-person">ako</span>{" "}
-            <span className="text-action">kumain</span>.
-            <span className="text-muted ml-2">(I did not eat)</span>
-          </div>
-          <div>
-            <span className="text-action">Kumain</span>{" "}
-            <span className="text-person">ka</span>{" "}
-            <span className="text-question">ba</span>?
-            <span className="text-muted ml-2">(Did you eat?)</span>
-          </div>
+    <div className="animate-rise">
+      {/* Header + target-build controls in one row: keeps Free build inside one viewport. */}
+      <header className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <Eyebrow>Sentence Builder</Eyebrow>
+          <h1 className="mt-1.5 text-[28px] font-semibold leading-none tracking-tight">Assemble the pieces.</h1>
         </div>
-      </div>
+        <div className="flex items-center gap-2">
+          {s && s.totalReps > 0 && <span className="mr-2 text-[12.5px] tabular-nums text-muted">{s.totalReps} built · {acc}%</span>}
+          <span className="mr-1 text-[10.5px] font-semibold uppercase tracking-[0.1em] text-faint">Build to a target</span>
+          <Link href="/builder/play/?level=simple&reps=10" className="h-9 rounded-lg border border-line px-3 text-[13px] font-medium leading-[34px] hover:border-foreground/60">Simple · 10</Link>
+          <LinkButton href="/builder/play/?level=full&reps=15" variant="primary" size="sm">Build 15 <Kbd className="!bg-white/15 !border-white/25 !text-accent-fg">↵</Kbd></LinkButton>
+        </div>
+      </header>
+
+      <section className="mt-6">
+        <div className="flex items-baseline justify-between">
+          <Eyebrow>Free build</Eyebrow>
+          {line.length > 0 && <button onClick={() => setLine([])} className="text-[13px] text-muted hover:text-foreground">Clear</button>}
+        </div>
+        <div className="mt-2 flex min-h-[72px] flex-wrap items-end gap-x-3 gap-y-3 border-b border-line pb-3">
+          {line.length === 0 && <div className="text-[14px] text-faint">Tap a piece. Whatever can&rsquo;t come next greys out — hover it to see why.</div>}
+          {line.map((p, i) => (
+            <button key={i} onClick={() => setLine((l) => l.slice(0, i))} title="Remove from here" className="group relative flex flex-col items-center animate-pop hover:z-30">
+              <Info word={p.text} />
+              <span data-role={p.role} data-aspect={ASPECT_OF[p.text]} className="tl text-[28px] font-medium leading-none md:text-[34px]">
+                {i === 0 ? p.text.charAt(0).toUpperCase() + p.text.slice(1) : p.text}{i === line.length - 1 ? <span className="text-foreground">{isQ ? "?" : "."}</span> : null}
+              </span>
+              <span className="mt-1.5 text-[10px] font-semibold uppercase tracking-[0.1em] text-faint">{p.label}</span>
+            </button>
+          ))}
+        </div>
+
+        {/* One quiet line: the sentence is complete (with its meaning), or what may come next. */}
+        <div className="mt-2 min-h-[22px] text-[13.5px]" key={line.map((p) => p.text).join(" ")}>
+          {line.length > 0 && nu.complete && a.status === "ok" && (
+            <span className="animate-fade"><span className="font-semibold text-ok">Natural.</span> <span className="text-muted">{a.notes[0]}</span>{nu.next.length > 0 && <span className="text-faint"> · or add {nu.next.join(" · ")}</span>}</span>
+          )}
+          {line.length > 0 && !nu.complete && (
+            <span className="animate-fade text-muted">Next: {nu.next.join(" · ")}</span>
+          )}
+        </div>
+
+        <div className="mt-4 space-y-1.5">
+          {/* Which verb the two verb rows (and the things) are built from. */}
+          <div className="flex flex-wrap items-center gap-1 pb-2">
+            <span className="w-24 shrink-0 text-[10px] font-semibold uppercase tracking-[0.1em] text-faint md:w-28">root</span>
+            {ROOTS.map((r) => (
+              <button key={r} onClick={() => pickRoot(r)} aria-pressed={root === r} title={VERBS[r].meaning} data-role="verb"
+                className={`tl rounded-md border px-2 py-0.5 text-[17px] leading-tight transition-colors ${root === r ? "border-current bg-surface" : "border-transparent opacity-50 hover:opacity-100"}`}>{r}</button>
+            ))}
+            <span className="ml-2 text-[12px] text-faint">{VERBS[root].meaning} · pick a root to change the verb rows</span>
+          </div>
+          {GROUPS.map((g) => (
+            <div key={g.label} className="flex flex-wrap items-center gap-1">
+              <span className="w-24 shrink-0 text-[10px] font-semibold uppercase tracking-[0.1em] text-faint md:w-28">{g.label}</span>
+              {g.pieces.map((w) => {
+                const ok = v[w]?.allowed ?? true;
+                return (
+                  <button key={w} aria-disabled={!ok}
+                    onClick={() => ok && setLine((l) => [...l, { text: w, role: g.role, label: g.label.split(" · ")[0] }])} data-role={ok ? g.role : undefined} data-aspect={ok ? ASPECT_OF[w] : undefined}
+                    className={`group relative tl rounded-md border px-2 py-0.5 text-[17px] leading-tight transition-[transform,border-color,opacity] hover:z-30 focus-visible:z-30 ${ok ? "border-line bg-card hover:-translate-y-px hover:border-current active:translate-y-0 active:scale-95" : "cursor-help border-transparent bg-surface/60 text-faint opacity-60"}`}>
+                    {w}
+                    <Info word={w} reason={ok ? undefined : v[w]?.reason} />
+                  </button>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+      </section>
+      <EnterToStart href="/builder/play/?level=full&reps=15" />
     </div>
   );
 }
