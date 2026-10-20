@@ -1,3 +1,5 @@
+// https://github.com/global-asp/global-asp/tree/master/tl
+
 // Prints every spoken line as JSON: [{id, text, voice?}]. Used by gen-audio.py.
 // voice: "A" = female (Blessica), "B" = male (Angelo). Omitted = decided by id suffix (legacy lessons).
 import { lessons } from "../src/content";

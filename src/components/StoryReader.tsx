@@ -7,6 +7,8 @@ import { ROLE_LABEL } from "@/content/types";
 import { Button, ExerciseBar, Eyebrow, Kbd, ProgressLine } from "./ui";
 import { recordRepToday } from "@/lib/today";
 import { shuffle } from "@/lib/exercises";
+import { ChunkView } from "./ChunkView";
+import { MorphologyView, hasMorphology } from "./Morphology";
 
 /* Story reader: one line at a time, large; the previous and next lines faint.
    Tap a word for its role and meaning. Audio per line when the file exists.
@@ -62,6 +64,8 @@ export function StoryReader({ story }: { story: Story }) {
   const [done, setDone] = useState(false);
   const [quiz, setQuiz] = useState(false);
   const [build, setBuild] = useState(false);
+  const [chunks, setChunks] = useState(false);
+  const [morphToken, setMorphToken] = useState<number | null>(null);
   const audio = useRef<HTMLAudioElement | null>(null);
   const exit = "/library/stories/";
   const line = story.lines[i];
@@ -80,7 +84,7 @@ export function StoryReader({ story }: { story: Story }) {
   }, [rate, stop]);
 
   const go = useCallback((n: number) => {
-    stop(); setTok(null);
+    stop(); setTok(null); setChunks(false); setMorphToken(null);
     if (n >= story.lines.length) {
       if (story.quiz?.length) { setQuiz(true); return; }
       setDone(true);
